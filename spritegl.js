@@ -165,11 +165,19 @@ function spritebatch()
 	return new SpriteBatch(this);
 }
 
-function SpriteBatch(gl)
+function SpriteBatch(gl, usage)
 {
+	usage = usage || "static";
+	
 	if(!spriteShader) {
 		spriteShader = gl.shader(spriteShaderVert, spriteShaderFrag);
 	}
+	
+	var usages = {
+		"static":  this.STATIC_DRAW,
+		"dynamic": this.DYNAMIC_DRAW,
+		"stream":  this.STREAM_DRAW,
+	};
 	
 	this.gl = gl;
 	this.orderFunc = undefined;
@@ -177,7 +185,7 @@ function SpriteBatch(gl)
 	this.count = 0;
 	this.textures = [];
 	this.vertices = gl.buffer("byte", [0, 1, 2, 3]);
-	this.spritebuf = gl.buffer("float", this.capacity * spriteBlockLength);
+	this.spritebuf = gl.buffer(usages[usage], "float", this.capacity * spriteBlockLength);
 	this.sprites = Array(spriteStartCapacity);
 }
 
@@ -195,6 +203,15 @@ SpriteBatch.prototype = {
 		}
 		
 		return id;
+	},
+	
+	clear: function()
+	{
+		for(var i=0; i<count; i++) {
+			this.sprites[i].batch = undefined;
+		}
+		
+		this.count = 0;
 	},
 	
 	add: function(sprite)
