@@ -27,7 +27,7 @@ function atlas(url, readyFunc)
 		{
 			for(var i=0; i<json.frames.length; i++) {
 			
-				frames[json.frames[i].name] = this.frame(tex, json.frames[i]);
+				frames[json.frames[i].name] = Frame(tex, json.frames[i]);
 			}
 			
 			if(readyFunc) {

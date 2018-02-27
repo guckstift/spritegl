@@ -1,6 +1,4 @@
-webgl.plugins.frame = frame;
-
-function frame(texture, framedata)
+function Frame(texture, framedata)
 {
 	return {
 		texture: texture,

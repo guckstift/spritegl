@@ -1,68 +1,5 @@
 (function() {
 
-webgl.plugins.frame = frame;
-
-function frame(texture, framedata)
-{
-	return {
-		texture: texture,
-		name: framedata.name,
-		size: framedata.size,
-		osize: framedata.osize,
-		pos: framedata.pos,
-		pad: framedata.pad,
-		texcoordpos: [framedata.pos[0] / texture.size[0], framedata.pos[1] / texture.size[1]],
-		texcoordsize: [framedata.size[0] / texture.size[0], framedata.size[1] / texture.size[1]],
-	};
-}
-var atlasCache = {};
-
-webgl.plugins.atlas = atlas;
-webgl.loadJson = loadJson;
-
-function atlas(url, readyFunc)
-{
-	var frames = {};
-	
-	if(atlasCache[url]) {
-		if(readyFunc) {
-			readyFunc(frames);
-		}
-		
-		return atlasCache[url];
-	}
-
-	loadJson(url, jsonLoad.bind(this));
-
-	return frames;
-
-	function jsonLoad(json)
-	{
-		var tex = this.textureFromUrl(json.texurl, texLoad.bind(this))
-	
-		function texLoad()
-		{
-			for(var i=0; i<json.frames.length; i++) {
-			
-				frames[json.frames[i].name] = this.frame(tex, json.frames[i]);
-			}
-			
-			if(readyFunc) {
-				readyFunc(frames);
-			}
-		}
-	}
-}
-
-function loadJson(url, callback)
-{
-	webgl.loadText(url, textLoad);
-	
-	function textLoad(text)
-	{
-		callback(JSON.parse(text));
-	}
-}
 webgl.plugins.sprite = sprite;
 
 function sprite(frame, pos, anchor)
@@ -119,6 +56,91 @@ Sprite.prototype = {
 	},
 
 };
+webgl.plugins.spritecamera = Camera;
+
+function Camera(pos, focus, zoom)
+{
+	if(!(this instanceof Camera)) {
+		return new Camera(pos, focus, zoom);
+	}
+	
+	this.pos = pos || [0, 0];
+	this.focus = focus || [0, 0];
+	this.zoom = zoom || 1;
+}
+
+Camera.prototype = {
+
+	constructor: Camera,
+	
+	move: function(relX, relY)
+	{
+		this.pos[0] += relX;
+		this.pos[1] += relY;
+	},
+
+};
+function Frame(texture, framedata)
+{
+	return {
+		texture: texture,
+		name: framedata.name,
+		size: framedata.size,
+		osize: framedata.osize,
+		pos: framedata.pos,
+		pad: framedata.pad,
+		texcoordpos: [framedata.pos[0] / texture.size[0], framedata.pos[1] / texture.size[1]],
+		texcoordsize: [framedata.size[0] / texture.size[0], framedata.size[1] / texture.size[1]],
+	};
+}
+var atlasCache = {};
+
+webgl.plugins.atlas = atlas;
+webgl.loadJson = loadJson;
+
+function atlas(url, readyFunc)
+{
+	var frames = {};
+	
+	if(atlasCache[url]) {
+		if(readyFunc) {
+			readyFunc(frames);
+		}
+		
+		return atlasCache[url];
+	}
+
+	loadJson(url, jsonLoad.bind(this));
+
+	return frames;
+
+	function jsonLoad(json)
+	{
+		var tex = this.textureFromUrl(json.texurl, texLoad.bind(this))
+	
+		function texLoad()
+		{
+			for(var i=0; i<json.frames.length; i++) {
+			
+				frames[json.frames[i].name] = Frame(tex, json.frames[i]);
+			}
+			
+			if(readyFunc) {
+				readyFunc(frames);
+			}
+		}
+	}
+}
+
+function loadJson(url, callback)
+{
+	webgl.loadText(url, textLoad);
+	
+	function textLoad(text)
+	{
+		callback(JSON.parse(text));
+	}
+}
 webgl.plugins.spritebatch = spritebatch;
 
 var spriteStartCapacity = 16;
@@ -134,11 +156,16 @@ var spriteShaderVert = [
 	"attribute vec2 aTexCoordSize;",
 	"attribute float aTexId;",
 	"uniform vec2 uScreenSize;",
+	"uniform vec2 uCamPos;",
+	"uniform vec2 uCamFocus;",
+	"uniform float uZoom;",
 	"varying vec2 vTexCoord;",
 	"varying float vTexId;",
 	"void main() {",
 	"	vec2 vert = vec2(mod(aVert, 2.0), floor(aVert / 2.0));",
-	"	vec2 screenPos = (vert - aAnchor) * aSize + aPos;",
+	"	vec2 screenPos = (vert - aAnchor) * aSize * uZoom + aPos * uZoom;",
+	"	screenPos -= uCamPos * uZoom;",
+	"	screenPos += uScreenSize * uCamFocus;",
 	"	vec2 clipPos = screenPos * vec2(+2.0, -2.0) / uScreenSize + vec2(-1.0, +1.0);",
 	"	gl_Position = vec4(clipPos, 0.0, 1.0);",
 	"	vTexCoord = aTexCoordPos + aTexCoordSize * vert;",
@@ -160,32 +187,33 @@ var spriteShaderFrag = [
 	"}",
 ].join("\n");
 
-function spritebatch()
+function spritebatch(usage, camera)
 {
-	return new SpriteBatch(this);
+	return new SpriteBatch(this, usage, camera);
 }
 
-function SpriteBatch(gl, usage)
+function SpriteBatch(gl, usage, camera)
 {
+	if(usage instanceof Camera) {
+		camera = usage;
+		usage = undefined;
+	}
+	
 	usage = usage || "static";
+	camera = camera || Camera();
 	
 	if(!spriteShader) {
 		spriteShader = gl.shader(spriteShaderVert, spriteShaderFrag);
 	}
-	
-	var usages = {
-		"static":  this.STATIC_DRAW,
-		"dynamic": this.DYNAMIC_DRAW,
-		"stream":  this.STREAM_DRAW,
-	};
 	
 	this.gl = gl;
 	this.orderFunc = undefined;
 	this.capacity = spriteStartCapacity;
 	this.count = 0;
 	this.textures = [];
+	this.camera = camera;
 	this.vertices = gl.buffer("byte", [0, 1, 2, 3]);
-	this.spritebuf = gl.buffer(usages[usage], "float", this.capacity * spriteBlockLength);
+	this.spritebuf = gl.buffer(usage, "float", this.capacity * spriteBlockLength);
 	this.sprites = Array(spriteStartCapacity);
 }
 
@@ -207,11 +235,13 @@ SpriteBatch.prototype = {
 	
 	clear: function()
 	{
-		for(var i=0; i<count; i++) {
+		for(var i=0; i<this.count; i++) {
 			this.sprites[i].batch = undefined;
 		}
 		
 		this.count = 0;
+		
+		return this;
 	},
 	
 	add: function(sprite)
@@ -320,6 +350,8 @@ SpriteBatch.prototype = {
 				this.update(tmp);
 			}
 		}
+		
+		return this;
 	},
 	
 	draw: function()
@@ -333,6 +365,9 @@ SpriteBatch.prototype = {
 				mode: "trianglestrip", count: 4, instances: this.count,
 				stride: 4 * spriteBlockLength, divisor: 1, buffer: this.spritebuf,
 				uScreenSize: this.gl.size,
+				uCamPos: this.camera.pos,
+				uCamFocus: this.camera.focus,
+				uZoom: this.camera.zoom,
 				uTextures: this.textures,
 				aVert: { buffer: this.vertices, stride: 0, divisor: 0 }, 
 				aPos: { offset: 0 * 4 },

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+import sys
+import os.path
+import json
+from PIL import Image, ImageDraw
+
 doDebug = False
 
 def findpos(destw, desth, srcw, srch, left, extents):
@@ -47,88 +52,91 @@ def packwith(destw, desth, textures):
 
 	return count
 
-import sys
-import os.path
-import json
-from PIL import Image, ImageDraw
+def pack(outfile, infiles):
 
-outfile = sys.argv[1]
-infiles = sys.argv[2:]
-textures = []
+	textures = []
+	total = len(infiles)
 
-total = len(infiles)
+	print(total, "images to store")
 
-print(total, "images to store")
-
-for name in infiles:
-	orig = Image.open(name)
-	bbox = orig.convert("RGBa").getbbox()
-	crop = orig.crop(bbox)
-	textures.append({
-		"name": os.path.basename(name),
-		"orig": orig,
-		"bbox": bbox,
-		"crop": crop,
-	})
+	for name in infiles:
+		orig = Image.open(name)
+		bbox = orig.convert("RGBa").getbbox()
+		crop = orig.crop(bbox)
+		textures.append({
+			"name": os.path.basename(name),
+			"orig": orig,
+			"bbox": bbox,
+			"crop": crop,
+		})
 	
-	print(orig.size, bbox)
+		print(orig.size, bbox)
 
-# sort by descending width
-textures.sort(key = lambda x: x["crop"].width * 1000000 + x["crop"].height, reverse = True)
+	# sort by descending width
+	textures.sort(key = lambda x: x["crop"].width * 1000000 + x["crop"].height, reverse = True)
 
-for powerx in range(12):
+	for powerx in range(12):
 
-	for powery in range(powerx + 1):
+		for powery in range(powerx + 1):
 	
-		sizex = 2 ** powerx
-		sizey = 2 ** powery
-		count = packwith(sizex, sizey, textures)
+			sizex = 2 ** powerx
+			sizey = 2 ** powery
+			count = packwith(sizex, sizey, textures)
 		
+			if count == total: break
+		
+			print("size", sizex, "x", sizey, "did not work.", count, "images fit into it.")
+	
 		if count == total: break
-		
-		print("size", sizex, "x", sizey, "did not work.", count, "images fit into it.")
-	
-	if count == total: break
 
-if count == total:
+	if count == total:
 
-	print("size", sizex, "x", sizey, "did work. all", count, "images fit into it.")
+		print("size", sizex, "x", sizey, "did work. all", count, "images fit into it.")
 	
-	result = Image.new("RGBA", (sizex, sizey))
+		result = Image.new("RGBA", (sizex, sizey))
 	
-	if doDebug:
-		draw = ImageDraw.Draw(result)
+		if doDebug:
+			draw = ImageDraw.Draw(result)
 	
-	for tex in textures:
-		result.paste(tex["crop"], tex["pos"])
-	
-	if doDebug:
 		for tex in textures:
-			draw.rectangle([
-				tex["pos"][0],
-				tex["pos"][1],
-				tex["pos"][0] + tex["crop"].size[0] - 1,
-				tex["pos"][1] + tex["crop"].size[1] - 1,
-			])
+			result.paste(tex["crop"], tex["pos"])
+	
+		if doDebug:
+			for tex in textures:
+				draw.rectangle([
+					tex["pos"][0],
+					tex["pos"][1],
+					tex["pos"][0] + tex["crop"].size[0] - 1,
+					tex["pos"][1] + tex["crop"].size[1] - 1,
+				])
 
-	result.save(outfile)
+		result.save(outfile)
 
-	texdata = {
-		"texurl": outfile,
-		"texsize": [sizex, sizey],
-		"frames": [
-			{
-				"name": tex["name"],
-				"size": tex["crop"].size,
-				"osize": tex["orig"].size,
-				"pos": tex["pos"],
-				"pad": tex["bbox"][:2],
-			}
-			for tex in textures
-		]
-	}
+		texdata = {
+			"texurl": outfile,
+			"texsize": [sizex, sizey],
+			"frames": [
+				{
+					"name": tex["name"],
+					"size": tex["crop"].size,
+					"osize": tex["orig"].size,
+					"pos": tex["pos"],
+					"pad": tex["bbox"][:2],
+				}
+				for tex in textures
+			]
+		}
 
-	jsonfile = os.path.splitext(outfile)[0] + ".json"
-	fs = open(jsonfile, "w")
-	json = json.dumps(texdata, sort_keys = True, separators = (",",":"))
-	fs.write(json)
+		jsonfile = os.path.splitext(outfile)[0] + ".json"
+		fs = open(jsonfile, "w")
+		jsn = json.dumps(texdata, sort_keys = True, separators = (",",":"))
+		fs.write(jsn)
+
+
+def main():
+
+	pack(sys.argv[1], sys.argv[2:])
+
+if __name__ == "__main__":
+	main()
+

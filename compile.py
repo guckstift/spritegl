@@ -6,9 +6,10 @@ thisDir = os.path.dirname(__file__)
 
 res = "(function() {\n\n"
 
+res += open(thisDir + "/src/sprite.js").read()
+res += open(thisDir + "/src/camera.js").read()
 res += open(thisDir + "/src/frame.js").read()
 res += open(thisDir + "/src/atlas.js").read()
-res += open(thisDir + "/src/sprite.js").read()
 res += open(thisDir + "/src/spritebatch.js").read()
 
 res += "\n\n})();"
