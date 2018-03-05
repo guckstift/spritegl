@@ -21,7 +21,7 @@ function atlas(url, readyFunc)
 
 	function jsonLoad(json)
 	{
-		var tex = this.textureFromUrl(json.texurl, texLoad.bind(this))
+		var tex = this.textureFromUrl(json.texurl, texLoad.bind(this));
 	
 		function texLoad()
 		{

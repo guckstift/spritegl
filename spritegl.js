@@ -116,7 +116,7 @@ function atlas(url, readyFunc)
 
 	function jsonLoad(json)
 	{
-		var tex = this.textureFromUrl(json.texurl, texLoad.bind(this))
+		var tex = this.textureFromUrl(json.texurl, texLoad.bind(this));
 	
 		function texLoad()
 		{
@@ -159,17 +159,18 @@ var spriteShaderVert = [
 	"uniform vec2 uCamPos;",
 	"uniform vec2 uCamFocus;",
 	"uniform float uZoom;",
+	"uniform bool uNoScale;",
 	"varying vec2 vTexCoord;",
 	"varying float vTexId;",
 	"void main() {",
-	"	vec2 vert = vec2(mod(aVert, 2.0), floor(aVert / 2.0));",
-	"	vec2 screenPos = (vert - aAnchor) * aSize * uZoom + aPos * uZoom;",
-	"	screenPos -= uCamPos * uZoom;",
-	"	screenPos += uScreenSize * uCamFocus;",
-	"	vec2 clipPos = screenPos * vec2(+2.0, -2.0) / uScreenSize + vec2(-1.0, +1.0);",
-	"	gl_Position = vec4(clipPos, 0.0, 1.0);",
-	"	vTexCoord = aTexCoordPos + aTexCoordSize * vert;",
-	"	vTexId = aTexId;",
+		"vec2 vert = vec2(mod(aVert, 2.0), floor(aVert / 2.0));",
+		"vec2 screenPos = (vert - aAnchor) * aSize * (uNoScale ? 1.0 : uZoom) + aPos * uZoom;",
+		"screenPos -= uCamPos * uZoom;",
+		"screenPos += uScreenSize * uCamFocus;",
+		"vec2 clipPos = screenPos * vec2(+2.0, -2.0) / uScreenSize + vec2(-1.0, +1.0);",
+		"gl_Position = vec4(clipPos, 0.0, 1.0);",
+		"vTexCoord = aTexCoordPos + aTexCoordSize * vert;",
+		"vTexId = aTexId;",
 	"}",
 ].join("\n");
 
@@ -179,28 +180,30 @@ var spriteShaderFrag = [
 	"varying vec2 vTexCoord;",
 	"varying float vTexId;",
 	"void main() {",
-	"	for(float i=0.0; i<8.0; i++) {",
-	"		if(i == vTexId) {",
-	"			gl_FragColor = texture2D(uTextures[int(i)], vTexCoord);",
-	"		}",
-	"	}",
+		"for(float i=0.0; i<8.0; i++) {",
+			"if(i == vTexId) {",
+				"gl_FragColor = texture2D(uTextures[int(i)], vTexCoord);",
+			"}",
+		"}",
 	"}",
 ].join("\n");
 
-function spritebatch(usage, camera)
+function spritebatch(usage, camera, noScale)
 {
-	return new SpriteBatch(this, usage, camera);
+	return new SpriteBatch(this, usage, camera, noScale);
 }
 
-function SpriteBatch(gl, usage, camera)
+function SpriteBatch(gl, usage, camera, noScale)
 {
 	if(usage instanceof Camera) {
+		noScale = camera;
 		camera = usage;
 		usage = undefined;
 	}
 	
 	usage = usage || "static";
 	camera = camera || Camera();
+	noScale = noScale || false;
 	
 	if(!spriteShader) {
 		spriteShader = gl.shader(spriteShaderVert, spriteShaderFrag);
@@ -212,6 +215,7 @@ function SpriteBatch(gl, usage, camera)
 	this.count = 0;
 	this.textures = [];
 	this.camera = camera;
+	this.noScale = noScale;
 	this.vertices = gl.buffer("byte", [0, 1, 2, 3]);
 	this.spritebuf = gl.buffer(usage, "float", this.capacity * spriteBlockLength);
 	this.sprites = Array(spriteStartCapacity);
@@ -368,6 +372,7 @@ SpriteBatch.prototype = {
 				uCamPos: this.camera.pos,
 				uCamFocus: this.camera.focus,
 				uZoom: this.camera.zoom,
+				uNoScale: this.noScale,
 				uTextures: this.textures,
 				aVert: { buffer: this.vertices, stride: 0, divisor: 0 }, 
 				aPos: { offset: 0 * 4 },
