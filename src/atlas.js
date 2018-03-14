@@ -2,6 +2,7 @@ var atlasCache = {};
 
 webgl.plugins.atlas = atlas;
 webgl.loadJson = loadJson;
+webgl.frame = Frame;
 
 function atlas(url, readyFunc)
 {

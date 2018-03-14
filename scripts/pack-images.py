@@ -61,7 +61,7 @@ def pack(outfile, infiles):
 
 	for name in infiles:
 		orig = Image.open(name)
-		bbox = orig.convert("RGBa").getbbox()
+		bbox = orig.convert("RGBa").getbbox() or (0,0,orig.size[0],orig.size[1])
 		crop = orig.crop(bbox)
 		textures.append({
 			"name": os.path.basename(name),
@@ -111,11 +111,17 @@ def pack(outfile, infiles):
 				])
 
 		result.save(outfile)
-
+		
 		texdata = {
 			"texurl": outfile,
 			"texsize": [sizex, sizey],
-			"frames": [
+			"frames": [],
+		}
+		
+		for tex in textures:
+		
+			print( tex["bbox"])
+			texdata["frames"].append(
 				{
 					"name": tex["name"],
 					"size": tex["crop"].size,
@@ -123,9 +129,7 @@ def pack(outfile, infiles):
 					"pos": tex["pos"],
 					"pad": tex["bbox"][:2],
 				}
-				for tex in textures
-			]
-		}
+			)
 
 		jsonfile = os.path.splitext(outfile)[0] + ".json"
 		fs = open(jsonfile, "w")

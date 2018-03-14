@@ -162,8 +162,8 @@ SpriteBatch.prototype = {
 			sprite.id * spriteBlockLength, [
 			sprite.pos[0],
 			sprite.pos[1],
-			sprite.frame.size[0],
-			sprite.frame.size[1],
+			sprite.frame.size[0] * sprite.scale[0],
+			sprite.frame.size[1] * sprite.scale[1],
 			anchor[0],
 			anchor[1],
 			sprite.frame.texcoordpos[0],

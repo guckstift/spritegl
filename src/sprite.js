@@ -13,6 +13,7 @@ function Sprite(frame, pos, anchor)
 	this.setFrame(frame);
 	this.setPos(pos || [0, 0]);
 	this.setAnchor(anchor || [0.5, 0.5]);
+	this.setScale([1, 1]);
 }
 
 Sprite.prototype = {
@@ -45,6 +46,17 @@ Sprite.prototype = {
 	setAnchor: function(anchor)
 	{
 		this.anchor = anchor;
+		
+		if(this.batch) {
+			this.batch.update(this);
+		}
+		
+		return this;
+	},
+	
+	setScale: function(scale)
+	{
+		this.scale = scale;
 		
 		if(this.batch) {
 			this.batch.update(this);
